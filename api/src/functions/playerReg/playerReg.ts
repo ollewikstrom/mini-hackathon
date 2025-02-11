@@ -55,7 +55,6 @@ async function sendWebPubSubMessage(player: Player, context: InvocationContext) 
 
         const serviceClient = new WebPubSubServiceClient(process.env.WEB_PUBSUB_CONNECTION_STRING, "miniHackathon");
         const groupClient = serviceClient.group(player.gameId);
-        await groupClient.addUser("server");
         await groupClient.sendToAll({message: "A new player joined the game", player});
 
         context.log("Web PubSub message sent successfully");

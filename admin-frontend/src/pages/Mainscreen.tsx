@@ -1,49 +1,82 @@
 import { useEffect, useState } from "react";
 import { WebPubSubClient } from "@azure/web-pubsub-client";
+import { createAvatar } from "@dicebear/core";
+import { bottts } from "@dicebear/collection";
 
+type Player = {
+	id: string;
+	screenName: string;
+	email: string;
+	gameId: string;
+	avatar: string;
+};
 
+type PlayerJoinedMessage = {
+	message: string;
+	player: Player;
+};
 
-export default function MainScreen() {
-  const [players, setPlayers] = useState([]);
-  const [client, setClient] = useState<any | null>(null);
-  const [gameId, setGameId] = useState("1234");
+type MainScreenProps = {
+	client: WebPubSubClient;
+	gameId: string;
+};
 
-  console.log(import.meta.env.VITE_WEB_PUBSUB_CLIENT_ACCESS_URL);
+export default function MainScreen({ client, gameId }: MainScreenProps) {
+	const [players, setPlayers] = useState<Player[]>([]);
 
-  useEffect(() => {
-    
-    const connect = async () => {
-        const res = await fetch("http://localhost:7071/api/negotiate?userId=server");
-        const { url, accessToken } = await res.json();
-        const ws = new WebSocket(url)
-        ws.onopen = () => console.log("connected");
-        ws.onmessage = (msg) => console.log(msg.data);
+	useEffect(() => {
+		const handleMessage = (msg: any) => {
+			console.log("Received message:", msg.message.data);
+			if (msg.message.data.message === "A new player joined the game") {
+				const message = msg.message.data as PlayerJoinedMessage;
+				setPlayers((prevPlayers) => [
+					...prevPlayers,
+					{
+						...message.player,
+						avatar: createAvatar(bottts, {
+							size: 128,
+							seed: message.player.email,
+						}).toDataUri(),
+					},
+				]);
+			}
+		};
 
-    }
-    connect();
+		client.on("group-message", handleMessage);
 
-    return () => {
-      if (client) {
-        client.stop();
-      }
-    };
-  }, []);
+		return () => {
+			client.off("group-message", handleMessage);
+		};
+	}, [client]);
 
+	const sendStartMessage = () => {
+		client.sendToGroup(gameId, { message: "Start Game" }, "json");
+	};
+	const sendEndMessage = () => {
+		client.sendToGroup(gameId, { message: "End Game" }, "json");
+	};
 
-  const sendMessage = async () => {
-    if (client) {
-      await client.sendToGroup(gameId, { message: "Hello, players!" }, "text");
-    }
-  }
-
-  
-
-  return (
-    <div style={{ textAlign: "center" }}>
-      <h1>Waiting Room</h1>
-      <h2>Players:</h2>
-      <button onClick={() => sendMessage}>Click</button>
-     
-    </div>
-  );
+	return (
+		<div className="flex flex-col items-center h-full gap-4">
+			<h1 className="text-4xl">Waiting Room</h1>
+			<h2 className="text-2xl">Players:</h2>
+			<ul className="flex gap-4 flex-wrap">
+				{players.map((player) => (
+					<li
+						key={player.id}
+						className="flex items-center gap-4 flex-col"
+					>
+						<div className="avatar">
+							<div className="ring-primary ring-offset-base-100 w-24 rounded-full ring ring-offset-2">
+								<img src={player.avatar} />
+							</div>
+						</div>
+						<p className="text-2xl">{player.screenName}</p>
+					</li>
+				))}
+			</ul>
+			<button onClick={sendStartMessage}>Start game</button>
+			<button onClick={sendEndMessage}>End game</button>
+		</div>
+	);
 }
