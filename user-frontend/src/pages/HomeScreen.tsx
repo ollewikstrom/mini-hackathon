@@ -2,6 +2,8 @@ import { WebPubSubClient } from "@azure/web-pubsub-client";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 
+import { v4 as uuid } from "uuid";
+
 type HomeScreenProps = {
 	client: WebPubSubClient;
 };
@@ -9,14 +11,11 @@ type HomeScreenProps = {
 export default function HomeScreen({ client }: HomeScreenProps) {
 	// Get params from URL
 	const { gameId } = useParams();
-	console.log("gameId", gameId);
 
 	const navigate = useNavigate();
 
 	const [submitted, setSubmitted] = useState(false);
 	const coundownTime = 6;
-
-	const [gameOver, setGameOver] = useState(false);
 
 	const [countdown, setCountdown] = useState(coundownTime);
 
@@ -49,6 +48,10 @@ export default function HomeScreen({ client }: HomeScreenProps) {
 		const formData = new FormData(e.currentTarget);
 		const screenName = formData.get("screenName") as string;
 		const email = formData.get("email") as string;
+		const userId = uuid();
+		localStorage.setItem("userId", userId);
+
+		console.log("User ID:", userId);
 
 		// Send the data to the backend
 		fetch(`${import.meta.env.VITE_API_URL}/playerReg`, {
@@ -57,6 +60,7 @@ export default function HomeScreen({ client }: HomeScreenProps) {
 				"Content-Type": "application/json",
 			},
 			body: JSON.stringify({
+				userId,
 				gameId,
 				screenName,
 				email,
@@ -71,6 +75,8 @@ export default function HomeScreen({ client }: HomeScreenProps) {
 				console.error("Error:", error);
 			});
 	};
+
+	//On load, check if the user id is in the current game group
 
 	return (
 		<div className="min-h-screen flex flex-col items-center justify-center gap-4">

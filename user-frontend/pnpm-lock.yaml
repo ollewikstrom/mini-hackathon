@@ -23,6 +23,9 @@ importers:
       react-router:
         specifier: ^7.1.5
         version: 7.1.5(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
+      uuid:
+        specifier: ^11.0.5
+        version: 11.0.5
     devDependencies:
       '@eslint/js':
         specifier: ^9.19.0
@@ -1365,6 +1368,10 @@ packages:
   util-deprecate@1.0.2:
     resolution: {integrity: sha512-EPD5q1uXyFxJpCrLnCc1nHnq3gOa6DZBocAIiI2TaSCA7VCJ1UJDMagCzIkXNsUYfD1daK//LTEQ8xiIbrHtcw==}
 
+  uuid@11.0.5:
+    resolution: {integrity: sha512-508e6IcKLrhxKdBbcA2b4KQZlLVp2+J5UwQ6F7Drckkc5N9ZJwFa4TgWtsww9UG8fGHbm6gbV19TdM5pQ4GaIA==}
+    hasBin: true
+
   vite@6.1.0:
     resolution: {integrity: sha512-RjjMipCKVoR4hVfPY6GQTgveinjNuyLw+qruksLDvA5ktI1150VmcMBKmQaEWJhg/j6Uaf6dNCNA0AfdzUb/hQ==}
     engines: {node: ^18.0.0 || ^20.0.0 || >=22.0.0}
@@ -2705,6 +2712,8 @@ snapshots:
       punycode: 2.3.1
 
   util-deprecate@1.0.2: {}
+
+  uuid@11.0.5: {}
 
   vite@6.1.0(jiti@1.21.7)(yaml@2.7.0):
     dependencies:

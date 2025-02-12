@@ -3,19 +3,26 @@ import "./App.css";
 import HomeScreen from "./pages/HomeScreen";
 import { WebPubSubClient } from "@azure/web-pubsub-client";
 import { getWebSocketClient } from "./ws/websocketClient";
-import { BrowserRouter, Route, Routes } from "react-router";
+import { Route, Routes, useLocation } from "react-router";
 import GameScreen from "./pages/GameScreen";
 import ResultScreen from "./pages/ResultScreen";
 
 function App() {
 	const [client, setClient] = useState<WebPubSubClient | null>(null);
 
+	//Get gameId from the route in the url
+	const location = useLocation();
+	const { pathname } = location;
+
+	// Remove the starting / from the pathname
+	const gameId = pathname.slice(1);
+	console.log("gameId", gameId);
+
 	useEffect(() => {
 		const setupWebSocket = async () => {
 			console.log("Initializing WebSocket...");
-			const wsClient = await getWebSocketClient();
+			const wsClient = await getWebSocketClient(gameId);
 			console.log("Got connected client");
-
 			setClient(wsClient);
 		};
 		console.log("only once right");
@@ -23,7 +30,7 @@ function App() {
 	}, []);
 
 	return (
-		<BrowserRouter>
+		<>
 			<Routes>
 				<Route
 					path=":gameId"
@@ -42,7 +49,7 @@ function App() {
 					element={client ? <ResultScreen /> : <p>Loading...</p>}
 				/>
 			</Routes>
-		</BrowserRouter>
+		</>
 	);
 }
 
