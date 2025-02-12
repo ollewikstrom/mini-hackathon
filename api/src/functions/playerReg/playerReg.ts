@@ -11,13 +11,15 @@ type PlayerRegRequest = {
 	gameId: string;
 	screenName: string;
 	email: string;
+	userId: string;
 };
 
-type Player = {
+export type Player = {
 	id: string;
 	gameId: string;
 	screenName: string;
 	email: string;
+	prompt?: string;
 };
 
 export async function playerReg(
@@ -28,8 +30,15 @@ export async function playerReg(
 		return { status: 405, body: "Method Not Allowed" };
 	}
 
-	const { screenName, email, gameId }: PlayerRegRequest =
+	const { screenName, email, gameId, userId }: PlayerRegRequest =
 		(await request.json()) as PlayerRegRequest;
+
+	context.log("Received player registration request", {
+		screenName,
+		email,
+		gameId,
+		userId,
+	});
 
 	if (!screenName || !email) {
 		return { status: 400, body: "Screen name and email are required" };
@@ -41,15 +50,31 @@ export async function playerReg(
 
 	const client = new CosmosClient(process.env.COSMOSDB_CONNECTION_STRING);
 	const database = client.database("mini-hackathon");
-	const container = database.container("players");
+	const playerContainer = database.container("players");
+	const gameContainer = database.container("games");
 
-	const player: Player = { id: email, screenName, email, gameId };
+	const player: Player = { id: userId, screenName, email, gameId };
 
-	const createdPlayer = await container.items.upsert(player);
+	const createdPlayer = await playerContainer.items.upsert(player);
 
 	if (!createdPlayer) {
 		return { status: 500, body: "Failed to create player" };
 	}
+
+	// Check if there is a game with the given gameId
+	const game = await gameContainer.item(gameId, gameId).read();
+	if (!game.resource) {
+		return { status: 404, body: "Game not found" };
+	}
+
+	const currentPlayerIds = game.resource.playerIds || [];
+	const currentPlayers = game.resource.players || [];
+
+	const updatedGame = await gameContainer.item(gameId, gameId).replace({
+		...game.resource,
+		players: [...currentPlayers, player],
+		playerIds: [...currentPlayerIds, player.id],
+	});
 
 	await sendWebPubSubMessage(player, context);
 

@@ -1,44 +1,73 @@
 import { useEffect, useState } from "react";
-import { getWebSocketClient, joinGroup } from "./ws/websocketClient";
+import { getWebSocketClient } from "./ws/websocketClient";
 import Mainscreen from "./pages/Mainscreen";
 import { WebPubSubClient } from "@azure/web-pubsub-client";
+import { Route, Routes, useLocation, useNavigate } from "react-router";
+import ResultScreen from "./pages/ResultScreen";
 
 export default function App() {
-  const [client, setClient] = useState<WebPubSubClient | null>(null);
-  const [gameId, setGameId] = useState("1234");
+	const [client, setClient] = useState<WebPubSubClient | null>(null);
 
-  useEffect(() => {
-    const setupWebSocket = async () => {
-      console.log("Initializing WebSocket...");
-      const wsClient = await getWebSocketClient();
-      console.log("Got connected client");
-      
-      setClient(wsClient);
-    };
-    console.log("only once right")
-    setupWebSocket();
-  }, []);
+	//Get gameId from the route in the url
+	const location = useLocation();
+	const { pathname } = location;
 
-  useEffect(() => {
-    if (client) {
-      joinGroup(gameId);
-    }
-  }, [client, gameId]);
+	// Remove the starting / from the pathname
+	const urlGameId = pathname.slice(1);
+	const [gameId, setGameId] = useState(urlGameId);
+	const navigate = useNavigate();
 
+	useEffect(() => {
+		const setupWebSocket = async () => {
+			console.log("Initializing WebSocket...");
+			const wsClient = await getWebSocketClient();
+			console.log("Got connected client");
 
+			setClient(wsClient);
+		};
+		console.log("only once right");
+		setupWebSocket();
+	}, []);
 
+	const changeGame = async () => {
+		console.log("change game");
+		await fetch(`${import.meta.env.VITE_API_URL}/createNewGame`, {
+			method: "GET",
+			headers: {
+				"Content-Type": "application/json",
+			},
+		})
+			.then((response) => response.json())
+			.then((data) => {
+				setGameId(data.id);
+				navigate(`/${data.id}`);
+			})
+			.catch((error) => {
+				alert(`Error: ${error}`);
+			});
+	};
 
-
-  const changeGame = () => {
-    console.log("change game")
-    setGameId("5678");
-  }
-
-  return (
-    <div className="min-h-screen flex flex-col items-center justify-center gap-4">
-      <h2 className="text-2xl text-center">Current game: <br></br><span className="italic">{gameId}</span></h2>
-      {client ? <Mainscreen client={client} gameId={gameId} /> : <p>Connecting...</p>}
-      <button onClick={changeGame}>Start new game</button>
-    </div>
-  );
+	return (
+		<>
+			<Routes>
+				<Route
+					path="/:gameId"
+					element={
+						client ? (
+							<Mainscreen client={client} gameId={gameId} />
+						) : (
+							<p>Connecting...</p>
+						)
+					}
+				/>
+				<Route
+					path="/"
+					element={
+						<button onClick={changeGame}>Start new game</button>
+					}
+				/>
+				<Route element={<ResultScreen />} path="/result/:gameId" />
+			</Routes>
+		</>
+	);
 }
