@@ -10,9 +10,7 @@ export const getWebSocketClient = async (gameId: string) => {
 	if (clientPromise) return clientPromise; // Return the pending promise to avoid duplicate fetch calls
 
 	clientPromise = fetch(
-		`${
-			import.meta.env.VITE_API_URL
-		}/negotiateUser?userId=player&groupId=${gameId}`
+		`${process.env.API_URL}/negotiateUser?userId=player&groupId=${gameId}`
 	)
 		.then((res) => res.json())
 		.then(({ url }) => {

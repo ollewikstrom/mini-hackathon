@@ -101,7 +101,7 @@ export default function MainScreen({ client, gameId }: MainScreenProps) {
 	useEffect(() => {
 		const fetchGame = async () => {
 			const response = await fetch(
-				`${import.meta.env.VITE_API_URL}/getGame?gameId=${gameId}`
+				`${process.env.API_URL}/getGame?gameId=${gameId}`
 			);
 			const data = await response.json();
 			setPlayers(
@@ -122,7 +122,7 @@ export default function MainScreen({ client, gameId }: MainScreenProps) {
 
 	return (
 		<div className="flex flex-col items-center h-full gap-4">
-			<h1 className="text-4xl">Game screen</h1>
+			<h1 className="text-4xl">Prompty Crush Saga</h1>
 			<h2 className="flex flex-col items-center">
 				The theme is: <span className="italic bold">{theme}</span>
 			</h2>

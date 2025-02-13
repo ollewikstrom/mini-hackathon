@@ -54,7 +54,7 @@ export default function HomeScreen({ client }: HomeScreenProps) {
 		console.log("User ID:", userId);
 
 		// Send the data to the backend
-		fetch(`${import.meta.env.VITE_API_URL}/playerReg`, {
+		fetch(`${process.env.API_URL}/playerReg`, {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",

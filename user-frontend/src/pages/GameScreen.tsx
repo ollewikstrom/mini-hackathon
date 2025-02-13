@@ -1,5 +1,5 @@
 import { WebPubSubClient } from "@azure/web-pubsub-client";
-import { use, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 
 type GameScreenProps = {
@@ -14,7 +14,7 @@ export default function GameScreen({ client }: GameScreenProps) {
 		undefined
 	);
 
-	const countdownTime = 5;
+	const countdownTime = 15;
 	const [countdown, setCountdown] = useState(countdownTime);
 	const theme = "Coffee";
 	const [submitted, setSubmitted] = useState(false);
@@ -64,20 +64,17 @@ export default function GameScreen({ client }: GameScreenProps) {
 
 	const submitPrompt = async () => {
 		const userId = localStorage.getItem("userId");
-		const response = await fetch(
-			`${import.meta.env.VITE_API_URL}/submitPrompt`,
-			{
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify({
-					gameId,
-					userId,
-					prompt,
-				}),
-			}
-		);
+		const response = await fetch(`${process.env.API_URL}/submitPrompt`, {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+			},
+			body: JSON.stringify({
+				gameId,
+				userId,
+				prompt,
+			}),
+		});
 
 		if (response.ok) {
 			console.log("Prompt submitted!");
