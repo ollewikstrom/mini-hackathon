@@ -1,12 +1,16 @@
 {
-    "routes": [
-      {
-        "route": "/api/*",
-        "allowedRoles": ["anonymous"]
-      }
-    ],
-    "globalHeaders": {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS"
-  }
-  }
+	"routes": [
+		{
+			"route": "/api/*",
+			"allowedRoles": ["anonymous"]
+		},
+		{
+			"route": "/*",
+			"allowedRoles": ["anonymous"]
+		}
+	],
+	"globalHeaders": {
+		"Access-Control-Allow-Origin": "*",
+		"Access-Control-Allow-Methods": "GET, POST, OPTIONS"
+	}
+}
