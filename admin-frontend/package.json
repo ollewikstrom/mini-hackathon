@@ -23,6 +23,7 @@
     "react-router": "^7.1.5"
   },
   "devDependencies": {
+    "@azure/static-web-apps-cli": "^2.0.3",
     "@eslint/js": "^9.19.0",
     "@types/node": "^22.13.1",
     "@types/react": "^19.0.8",

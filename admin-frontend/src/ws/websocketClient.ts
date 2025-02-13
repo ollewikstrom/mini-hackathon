@@ -6,6 +6,7 @@ let client: WebPubSubClient | null = null;
 let isConnected = false;
 
 export const getWebSocketClient = async () => {
+	console.log("process.env.API_URL", process.env.API_URL);
 	if (client) return client; // Return existing instance if it exists
 	if (clientPromise) return clientPromise; // Return the pending promise to avoid duplicate fetch calls
 
