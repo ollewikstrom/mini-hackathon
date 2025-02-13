@@ -22,7 +22,7 @@ export async function getGame(
 	}
 
 	const client = new CosmosClient(process.env.COSMOSDB_CONNECTION_STRING);
-	const database = client.database("mini-hackathon");
+	const database = client.database("mini-prompt-quiz");
 	const gameContainer = database.container("games");
 
 	const game = await gameContainer.item(gameId, gameId).read();

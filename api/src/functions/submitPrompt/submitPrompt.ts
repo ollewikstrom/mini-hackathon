@@ -24,9 +24,8 @@ export async function submitPrompt(
 		(await request.json()) as SubmitPromptRequest;
 
 	const client = new CosmosClient(process.env.COSMOSDB_CONNECTION_STRING);
-	const database = client.database("mini-hackathon");
+	const database = client.database("mini-prompt-quiz");
 	const playerContainer = database.container("players");
-	const gameContainer = database.container("games");
 
 	const player = await playerContainer.item(userId, gameId).read();
 	if (!player) {

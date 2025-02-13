@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { getWebSocketClient } from "./ws/websocketClient";
-import Mainscreen from "./pages/Mainscreen";
+import MainScreen from "./pages/MainScreen";
 import { WebPubSubClient } from "@azure/web-pubsub-client";
 import { Route, Routes, useLocation, useNavigate } from "react-router";
 import ResultScreen from "./pages/ResultScreen";
@@ -31,7 +31,7 @@ export default function App() {
 
 	const changeGame = async () => {
 		console.log("change game");
-		await fetch(`${import.meta.env.VITE_API_URL}/createNewGame`, {
+		await fetch(`${process.env.API_URL}/createNewGame`, {
 			method: "GET",
 			headers: {
 				"Content-Type": "application/json",
@@ -54,7 +54,7 @@ export default function App() {
 					path="/:gameId"
 					element={
 						client ? (
-							<Mainscreen client={client} gameId={gameId} />
+							<MainScreen client={client} gameId={gameId} />
 						) : (
 							<p>Connecting...</p>
 						)
