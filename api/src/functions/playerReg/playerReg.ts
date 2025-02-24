@@ -83,6 +83,7 @@ export async function playerReg(
 		body: JSON.stringify({
 			message: "Successfully created player",
 			createdPlayer: createdPlayer.resource,
+			theme: updatedGame.resource.judge.theme,
 		}),
 	};
 }

@@ -20,6 +20,7 @@ interface AIAnswer {
 	id: string;
 	gameId: string;
 	playerId: string;
+	playerName: string;
 	questionId: string;
 	question: string;
 	assistantPrompt: string;
@@ -150,6 +151,7 @@ export async function generateJudgements(
 						gameId: gameId,
 						aiAnswerId: response.id,
 						playerId: response.playerId,
+						playerName: response.playerName,
 						questionId: response.questionId,
 						contextScore: judgementContent.contextScore,
 						technicalScore: judgementContent.technicalScore,
@@ -244,9 +246,6 @@ async function parseFormattedResponse(
 	// Remove backticks and any leading/trailing whitespace
 	response = response.replace(/```/g, "").trim();
 
-	// Log the cleaned response for debugging
-	await context.log("Parsing cleaned response:", response);
-
 	// Extract scores with or without denominators
 	const contextMatch = response.match(/Context Score:\s*(\d+)(?:\/300)?/);
 	const technicalMatch = response.match(/Technical Score:\s*(\d+)(?:\/400)?/);
@@ -257,15 +256,6 @@ async function parseFormattedResponse(
 	const justificationMatch = response.match(
 		/Justification:\s*([\s\S]+?)(?=\n|$)/
 	);
-
-	// Log matches for debugging
-	await context.log("Score matches:", {
-		contextMatch,
-		technicalMatch,
-		clarityMatch,
-		finalMatch,
-		justificationMatch,
-	});
 
 	if (!contextMatch) throw new Error("Could not parse Context Score");
 	if (!technicalMatch) throw new Error("Could not parse Technical Score");

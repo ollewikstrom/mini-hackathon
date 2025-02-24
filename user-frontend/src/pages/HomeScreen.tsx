@@ -18,6 +18,7 @@ export default function HomeScreen({ client }: HomeScreenProps) {
 	const coundownTime = 6;
 
 	const [countdown, setCountdown] = useState(coundownTime);
+	const [theme, setTheme] = useState("");
 
 	useEffect(() => {
 		const handleMessage = (msg: any) => {
@@ -31,7 +32,7 @@ export default function HomeScreen({ client }: HomeScreenProps) {
 				setTimeout(() => {
 					clearInterval(interval);
 					console.log("Game has started!");
-					navigate(`/game/${gameId}`);
+					navigate(`/game/${gameId}?theme=${theme}`);
 				}, coundownTime * 1000);
 			}
 		};
@@ -70,6 +71,7 @@ export default function HomeScreen({ client }: HomeScreenProps) {
 			.then((data) => {
 				console.log("Success:", data);
 				setSubmitted(true);
+				setTheme(data.theme);
 			})
 			.catch((error) => {
 				console.error("Error:", error);

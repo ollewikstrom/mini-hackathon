@@ -31,6 +31,7 @@ interface AIAnswer {
 	id: string;
 	gameId: string;
 	playerId: string;
+	playerName: string;
 	questionId: string;
 	question: string;
 	assistantPrompt: string;
@@ -139,6 +140,7 @@ export async function generateAnswers(
 						id: `${gameId}-${player.id}-${judgeQ.id}`,
 						gameId: player.gameId,
 						playerId: player.id,
+						playerName: player.screenName,
 						questionId: judgeQ.id,
 						question: judgeQ.content,
 						assistantPrompt: player.prompt,

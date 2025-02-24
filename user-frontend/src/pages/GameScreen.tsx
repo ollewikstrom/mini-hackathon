@@ -1,6 +1,6 @@
 import { WebPubSubClient } from "@azure/web-pubsub-client";
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router";
+import { useNavigate, useParams, useSearchParams } from "react-router";
 
 type GameScreenProps = {
 	client: WebPubSubClient;
@@ -8,6 +8,9 @@ type GameScreenProps = {
 
 export default function GameScreen({ client }: GameScreenProps) {
 	const { gameId } = useParams();
+	// Get the theme from the query params
+	const [searchParams, setSearchParams] = useSearchParams();
+	const theme = searchParams.get("theme") || "";
 	const navigate = useNavigate();
 
 	const intervalRef = useRef<ReturnType<typeof setTimeout> | undefined>(
@@ -16,7 +19,6 @@ export default function GameScreen({ client }: GameScreenProps) {
 
 	const countdownTime = 15;
 	const [countdown, setCountdown] = useState(countdownTime);
-	const theme = "Coffee";
 	const [submitted, setSubmitted] = useState(false);
 	const [prompt, setPrompt] = useState("");
 

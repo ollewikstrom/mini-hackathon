@@ -122,7 +122,7 @@ export default function MainScreen({ client, gameId }: MainScreenProps) {
 
 	return (
 		<div className="flex flex-col items-center h-full gap-4">
-			<h1 className="text-4xl">Prompty Crush Saga</h1>
+			<h1 className="text-4xl">Bot-Pub-Quiz</h1>
 			<h2 className="flex flex-col items-center">
 				The theme is: <span className="italic bold">{theme}</span>
 			</h2>
