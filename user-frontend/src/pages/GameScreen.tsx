@@ -17,7 +17,7 @@ export default function GameScreen({ client }: GameScreenProps) {
 		undefined
 	);
 
-	const countdownTime = 15;
+	const countdownTime = 60;
 	const [countdown, setCountdown] = useState(countdownTime);
 	const [submitted, setSubmitted] = useState(false);
 	const [prompt, setPrompt] = useState("");

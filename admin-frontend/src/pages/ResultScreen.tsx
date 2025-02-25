@@ -1,5 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useParams } from "react-router";
+import FlipCard from "../components/FlipCard";
+import ChatBubble from "../components/ChatBubble";
+import { createAvatar } from "@dicebear/core";
+import { bottts } from "@dicebear/collection";
+import { judgeAvatar } from "./MainScreen";
 
 interface Answer {
 	playerName: string;
@@ -17,6 +22,7 @@ interface Response {
 	assistantPrompt: string;
 	answer: string;
 	timestamp: string;
+	avatar?: string; // New field for avatar
 }
 
 interface AnswersData {
@@ -57,6 +63,14 @@ interface PlayerScore {
 	totalScore: number;
 	judgementCount: number;
 	averageScore: number;
+	avatar?: string;
+}
+
+// Combined type to associate responses with their judgements
+interface AnswerWithJudgement {
+	response: Response;
+	judgement: Judgement | null;
+	isFlipped: boolean;
 }
 
 type Phase = "start" | "question" | "answers" | "judgements" | "leaderboard";
@@ -72,6 +86,9 @@ export default function ResultScreen() {
 	const [playerScores, setPlayerScores] = useState<PlayerScore[]>([]);
 	const [startTime, setStartTime] = useState<number>(Date.now());
 	const [questionIds, setQuestionIds] = useState<Set<number>>(new Set());
+	const [answerCards, setAnswerCards] = useState<AnswerWithJudgement[]>([]);
+	const [allCardsFlipped, setAllCardsFlipped] = useState<boolean>(false);
+	const flipTimerRef = useRef<NodeJS.Timeout | null>(null);
 
 	const generateAnswers = async (): Promise<void> => {
 		try {
@@ -79,6 +96,17 @@ export default function ResultScreen() {
 				`${process.env.API_URL}/generateAnswers?gameId=${gameId}`
 			);
 			const data: AnswersData = await response.json();
+
+			// Add avatars to each response
+			const responsesWithAvatars = data.responses.map((response) => ({
+				...response,
+				avatar: createAvatar(bottts, {
+					size: 128,
+					seed: response.playerId,
+				}).toDataUri(),
+			}));
+
+			data.responses = responsesWithAvatars;
 
 			// Create Set of question IDs
 			const ids = new Set<number>();
@@ -117,18 +145,24 @@ export default function ResultScreen() {
 
 	// Calculate player scores
 	useEffect(() => {
-		if (!judgements?.judgements) return;
+		if (!judgements?.judgements || !answers?.responses) return;
 
 		const scoreMap = new Map<string, PlayerScore>();
 
 		judgements.judgements.forEach((judgement) => {
 			if (!scoreMap.has(judgement.playerId)) {
+				// Find player's avatar from responses
+				const playerResponse = answers.responses.find(
+					(r) => r.playerId === judgement.playerId
+				);
+
 				scoreMap.set(judgement.playerId, {
 					playerName: judgement.playerName,
 					playerId: judgement.playerId,
 					totalScore: 0,
 					judgementCount: 0,
 					averageScore: 0,
+					avatar: playerResponse?.avatar,
 				});
 			}
 
@@ -143,7 +177,84 @@ export default function ResultScreen() {
 			(a, b) => b.averageScore - a.averageScore
 		);
 		setPlayerScores(scores);
-	}, [judgements]);
+	}, [judgements, answers]);
+
+	// Prepare answer cards with judgements
+	useEffect(() => {
+		if (
+			!currentQuestionId ||
+			!answers?.responses ||
+			!judgements?.judgements
+		)
+			return;
+
+		const currentResponses = answers.responses.filter(
+			(r) => r.questionId === currentQuestionId
+		);
+
+		const currentJudgements = judgements.judgements.filter(
+			(j) => j.questionId === currentQuestionId
+		);
+
+		// Associate each response with its judgement
+		const cards = currentResponses.map((response) => {
+			const judgement =
+				currentJudgements.find((j) => j.aiAnswerId === response.id) ||
+				null;
+
+			return {
+				response,
+				judgement,
+				isFlipped: false,
+			};
+		});
+
+		setAnswerCards(cards);
+		setAllCardsFlipped(false);
+	}, [currentQuestionId, answers, judgements]);
+
+	// Setup sequential card flipping when entering judgements phase
+	useEffect(() => {
+		if (showingPhase === "judgements" && !allCardsFlipped) {
+			// Start at -1 so the first increment puts us at index 0
+			let index = -1;
+
+			if (flipTimerRef.current) {
+				clearInterval(flipTimerRef.current);
+			}
+
+			// Reset all cards to unflipped state first
+			setAnswerCards((prev) =>
+				prev.map((card) => ({ ...card, isFlipped: false }))
+			);
+
+			flipTimerRef.current = setInterval(() => {
+				index++;
+
+				if (index < answerCards.length) {
+					setAnswerCards((prev) => {
+						return prev.map((card, i) => {
+							if (i === index) {
+								return { ...card, isFlipped: true };
+							}
+							return card;
+						});
+					});
+				} else {
+					if (flipTimerRef.current) {
+						clearInterval(flipTimerRef.current);
+						setAllCardsFlipped(true);
+					}
+				}
+			}, 800); // Flip one card every 800ms
+
+			return () => {
+				if (flipTimerRef.current) {
+					clearInterval(flipTimerRef.current);
+				}
+			};
+		}
+	}, [showingPhase, answerCards.length, allCardsFlipped]);
 
 	// Timer effect for automatic progression
 	useEffect(() => {
@@ -156,7 +267,6 @@ export default function ResultScreen() {
 
 				if (showingPhase === "start") {
 					if (currentTime - startTime >= 3000) {
-						// Reduced to 3 seconds
 						setShowingPhase("question");
 					}
 					return;
@@ -167,21 +277,30 @@ export default function ResultScreen() {
 				} else if (showingPhase === "answers") {
 					setShowingPhase("judgements");
 				} else if (showingPhase === "judgements") {
-					const sortedIds = Array.from(questionIds).sort(
-						(a, b) => a - b
-					);
-					const currentIndex = sortedIds.indexOf(currentQuestionId!);
+					// Only move to next question when all cards have been flipped
+					if (allCardsFlipped) {
+						const sortedIds = Array.from(questionIds).sort(
+							(a, b) => a - b
+						);
+						const currentIndex = sortedIds.indexOf(
+							currentQuestionId!
+						);
 
-					if (currentIndex >= sortedIds.length - 1) {
-						setShowingPhase("leaderboard");
-					} else {
-						setCurrentQuestionId(sortedIds[currentIndex + 1]);
-						setShowingPhase("question");
+						if (currentIndex >= sortedIds.length - 1) {
+							setShowingPhase("leaderboard");
+						} else {
+							setCurrentQuestionId(sortedIds[currentIndex + 1]);
+							setShowingPhase("question");
+						}
 					}
 				}
 			},
-			showingPhase === "start" ? 3000 : 5000
-		); // Changed start phase timer to 3 seconds
+			showingPhase === "start"
+				? 3000
+				: showingPhase === "judgements" && !allCardsFlipped
+				? 10000
+				: 5000
+		);
 
 		return () => clearInterval(timer);
 	}, [
@@ -191,6 +310,7 @@ export default function ResultScreen() {
 		judgements,
 		questionIds,
 		startTime,
+		allCardsFlipped,
 	]);
 
 	if (!answers?.responses || !judgements?.judgements) {
@@ -206,20 +326,8 @@ export default function ResultScreen() {
 		);
 	}
 
-	// Get all responses for the current question
-	const currentResponses = currentQuestionId
-		? answers.responses.filter((r) => r.questionId === currentQuestionId)
-		: [];
-
 	// Get the question text from any response (they all have the same question)
-	const currentQuestion = currentResponses[0]?.question || "";
-
-	// Get judgements for the current question
-	const currentJudgements = currentQuestionId
-		? judgements.judgements.filter(
-				(j) => j.questionId === currentQuestionId
-		  )
-		: [];
+	const currentQuestion = answerCards[0]?.response.question || "";
 
 	const renderStart = () => (
 		<div className="flex items-center justify-center h-screen bg-gradient-to-r from-purple-600 to-blue-600">
@@ -235,100 +343,148 @@ export default function ResultScreen() {
 		</div>
 	);
 
-	const renderQuestion = () => (
-		<div className="bg-white rounded-lg shadow-lg overflow-hidden w-full max-w-2xl mx-auto">
-			<div className="p-6 border-b border-gray-200">
-				<h2 className="text-2xl font-bold">
-					Question{" "}
-					{Array.from(questionIds)
-						.sort((a, b) => a - b)
-						.indexOf(currentQuestionId!) + 1}
-				</h2>
-			</div>
-			<div className="p-6">
-				<p className="text-lg text-gray-700">{currentQuestion}</p>
-			</div>
-		</div>
-	);
+	const renderJudgeWithQuestion = () => (
+		<div className="w-full max-w-3xl mx-auto mb-8">
+			<div className="flex flex-col items-center">
+				<div className="avatar flex flex-col items-center gap-4">
+					<div className="ring-primary ring-offset-base-100 w-24 rounded-full ring ring-offset-2">
+						<img src={judgeAvatar} alt="Mr Judge" />
+					</div>
+					<p className="text-xl font-semibold">Mr Judge</p>
+				</div>
 
-	const renderAnswers = () => (
-		<div className="bg-white rounded-lg shadow-lg overflow-hidden w-full max-w-2xl mx-auto">
-			<div className="p-6 border-b border-gray-200">
-				<h2 className="text-2xl font-bold">Answers</h2>
-			</div>
-			<div className="p-6">
-				<div className="space-y-4">
-					{currentResponses.map((response) => (
-						<div
-							key={response.id}
-							className="bg-gray-50 rounded-lg p-4"
-						>
-							<p className="font-semibold text-gray-800">
-								{response.playerName}
-							</p>
-							<p className="text-gray-600 mt-2">
-								{response.answer}
-							</p>
-						</div>
-					))}
+				<div className="mt-4 w-full">
+					<ChatBubble
+						position="top"
+						content={
+							<div>
+								<div className="pb-2 border-b border-gray-200">
+									<h2 className="text-2xl font-bold">
+										Question{" "}
+										{Array.from(questionIds)
+											.sort((a, b) => a - b)
+											.indexOf(currentQuestionId!) + 1}
+									</h2>
+								</div>
+								<div className="pt-4">
+									<p className="text-lg text-gray-700">
+										{currentQuestion}
+									</p>
+								</div>
+							</div>
+						}
+						backgroundColor="white"
+						textColor="black"
+						className="shadow-lg"
+					/>
 				</div>
 			</div>
 		</div>
 	);
 
-	const renderJudgements = () => (
-		<div className="bg-white rounded-lg shadow-lg overflow-hidden w-full max-w-2xl mx-auto">
-			<div className="p-6 border-b border-gray-200">
-				<h2 className="text-2xl font-bold">Judgements</h2>
+	const renderPlayersList = () => (
+		<div className="w-full max-w-3xl mx-auto mb-8">
+			<div className="flex flex-wrap justify-center gap-4">
+				{answerCards.map((card) => (
+					<div
+						key={card.response.playerId}
+						className="flex flex-col items-center"
+					>
+						<div className="w-16 h-16 rounded-full overflow-hidden ring-1 ring-gray-200">
+							<img
+								src={card.response.avatar}
+								alt={`${card.response.playerName}'s avatar`}
+							/>
+						</div>
+						<p className="text-sm font-medium mt-2">
+							{card.response.playerName}
+						</p>
+					</div>
+				))}
 			</div>
-			<div className="p-6">
-				<div className="space-y-6">
-					{currentJudgements.map((judgement) => (
-						<div
-							key={judgement.id}
-							className="bg-gray-50 rounded-lg p-4"
+		</div>
+	);
+
+	const renderAnswerBubbles = () => (
+		<div className="space-y-8 w-full max-w-3xl mx-auto">
+			{answerCards.map((card) => {
+				// Front content - the answer (very simplified)
+				const frontContent = (
+					<div>
+						<p style={{ margin: "10px 0" }}>
+							{card.response.answer}
+						</p>
+					</div>
+				);
+
+				// Back content - the judgement (very simplified)
+				const backContent = card.judgement ? (
+					<div>
+						<p
+							style={{
+								fontWeight: "bold",
+								fontSize: "18px",
+								marginBottom: "10px",
+							}}
 						>
-							<div className="flex justify-between mb-2">
-								<p className="font-semibold text-gray-800">
-									{judgement.playerName}
-								</p>
-								<p className="font-bold text-gray-800">
-									Total Score: {judgement.totalScore}
+							Score: {card.judgement.totalScore}
+						</p>
+
+						<div
+							style={{
+								display: "grid",
+								gridTemplateColumns: "1fr 1fr 1fr",
+								gap: "8px",
+								marginBottom: "10px",
+							}}
+						>
+							<div>
+								<p>Clarity: {card.judgement.clarityScore}</p>
+							</div>
+							<div>
+								<p>Context: {card.judgement.contextScore}</p>
+							</div>
+							<div>
+								<p>
+									Technical: {card.judgement.technicalScore}
 								</p>
 							</div>
-							<div className="grid grid-cols-3 gap-2 mb-2">
-								<div>
-									<p className="text-sm text-gray-600">
-										Clarity
-									</p>
-									<p className="font-medium text-gray-800">
-										{judgement.clarityScore}
-									</p>
-								</div>
-								<div>
-									<p className="text-sm text-gray-600">
-										Context
-									</p>
-									<p className="font-medium text-gray-800">
-										{judgement.contextScore}
-									</p>
-								</div>
-								<div>
-									<p className="text-sm text-gray-600">
-										Technical
-									</p>
-									<p className="font-medium text-gray-800">
-										{judgement.technicalScore}
-									</p>
-								</div>
+						</div>
+
+						<p style={{ fontStyle: "italic" }}>
+							{card.judgement.justification}
+						</p>
+					</div>
+				) : (
+					<div>
+						<p>No judgement available</p>
+					</div>
+				);
+
+				return (
+					<div key={card.response.id} className="flex gap-4 mb-12">
+						<div className="flex-shrink-0 w-14 flex flex-col items-center">
+							<div className="w-12 h-12 rounded-full overflow-hidden">
+								<img
+									src={card.response.avatar}
+									alt={`${card.response.playerName}'s avatar`}
+								/>
 							</div>
-							<p className="text-sm text-gray-600 mt-2">
-								{judgement.justification}
+							<p className="text-xs text-center mt-1">
+								{card.response.playerName}
 							</p>
 						</div>
-					))}
-				</div>
-			</div>
+
+						<div className="flex-grow">
+							<FlipCard
+								isFlipped={card.isFlipped}
+								frontContent={frontContent}
+								backContent={backContent}
+							/>
+						</div>
+					</div>
+				);
+			})}
 		</div>
 	);
 
@@ -355,19 +511,29 @@ export default function ResultScreen() {
 							<div className="flex items-center">
 								<span
 									className={`
-                  ${index === 0 ? "text-yellow-500" : "text-gray-500"}
-                  text-2xl font-bold mr-4
-                `}
+					  ${index === 0 ? "text-yellow-500" : "text-gray-500"}
+					  text-2xl font-bold mr-4
+					`}
 								>
 									#{index + 1}
 								</span>
-								<div>
-									<h3 className="text-xl font-bold">
-										{player.playerName}
-									</h3>
-									<p className="text-gray-600">
-										Total Score: {player.totalScore}
-									</p>
+								<div className="flex items-center gap-3">
+									{player.avatar && (
+										<div className="w-12 h-12 rounded-full overflow-hidden">
+											<img
+												src={player.avatar}
+												alt={`${player.playerName}'s avatar`}
+											/>
+										</div>
+									)}
+									<div>
+										<h3 className="text-xl font-bold">
+											{player.playerName}
+										</h3>
+										<p className="text-gray-600">
+											Total Score: {player.totalScore}
+										</p>
+									</div>
 								</div>
 							</div>
 							<div className="text-right">
@@ -386,9 +552,9 @@ export default function ResultScreen() {
 	);
 
 	return (
-		<div className="p-6">
+		<div className="p-6 min-h-screen bg-gradient-to-b from-purple-50 to-blue-50">
 			{showingPhase !== "start" && showingPhase !== "leaderboard" && (
-				<div className="mb-4 flex justify-between items-center max-w-2xl mx-auto">
+				<div className="mb-4 flex justify-between items-center max-w-3xl mx-auto">
 					<p className="text-sm text-gray-600">
 						Question{" "}
 						{Array.from(questionIds)
@@ -405,9 +571,21 @@ export default function ResultScreen() {
 			)}
 
 			{showingPhase === "start" && renderStart()}
-			{showingPhase === "question" && renderQuestion()}
-			{showingPhase === "answers" && renderAnswers()}
-			{showingPhase === "judgements" && renderJudgements()}
+
+			{showingPhase === "question" && (
+				<>
+					{renderJudgeWithQuestion()}
+					{renderPlayersList()}
+				</>
+			)}
+
+			{(showingPhase === "answers" || showingPhase === "judgements") && (
+				<>
+					{renderJudgeWithQuestion()}
+					{renderAnswerBubbles()}
+				</>
+			)}
+
 			{showingPhase === "leaderboard" && renderLeaderboard()}
 		</div>
 	);
