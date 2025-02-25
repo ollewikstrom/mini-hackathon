@@ -1,16 +1,10 @@
-import React, { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams } from "react-router";
 import FlipCard from "../components/FlipCard";
 import ChatBubble from "../components/ChatBubble";
 import { createAvatar } from "@dicebear/core";
 import { bottts } from "@dicebear/collection";
 import { judgeAvatar } from "./MainScreen";
-
-interface Answer {
-	playerName: string;
-	answer: string;
-	aiAnswerId: string;
-}
 
 interface Response {
 	id: string;
