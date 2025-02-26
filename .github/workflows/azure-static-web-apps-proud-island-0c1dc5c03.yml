@@ -25,41 +25,31 @@ jobs:
         with:
           node-version: '18'
           
-      # Build the API first
-      - name: Build API
+      # Modify .funcignore to exclude unnecessary files
+      - name: Update .funcignore
         working-directory: ./api
         run: |
-          npm ci
-          npm run build
-      
-      # Prepare optimized deployment package
-      - name: Prepare API for deployment 
-        working-directory: ./api
-        run: |
-          # Create deployment folder
-          mkdir -p ../api-deploy/src
+          echo "# Exclude unnecessary files to reduce deployment size" >> .funcignore
+          echo "node_modules/*/test" >> .funcignore
+          echo "node_modules/*/tests" >> .funcignore
+          echo "node_modules/*/docs" >> .funcignore
+          echo "node_modules/*/.github" >> .funcignore
+          echo "node_modules/*/.vscode" >> .funcignore
+          echo "node_modules/*/*.md" >> .funcignore
+          echo "node_modules/*/LICENSE" >> .funcignore
+          echo "node_modules/*/license" >> .funcignore
+          echo "node_modules/*/*.ts" >> .funcignore
+          echo "!node_modules/*/*.d.ts" >> .funcignore
+          echo "node_modules/*/*.map" >> .funcignore
+          echo "node_modules/*/src" >> .funcignore
+          echo "node_modules/*/examples" >> .funcignore
+          echo "node_modules/*/coverage" >> .funcignore
+          echo "node_modules/*/bin" >> .funcignore
+          echo "node_modules/*/man" >> .funcignore
+          echo "node_modules/*/.DS_Store" >> .funcignore
+          echo "node_modules/*/*.gitignore" >> .funcignore
           
-          # Copy only the necessary files
-          cp -r ./dist ../api-deploy/
-          cp package.json ../api-deploy/
-          cp package-lock.json ../api-deploy/
-          cp host.json ../api-deploy/
-          mkdir -p ../api-deploy/src/functions
-          cp -r ./src/functions/* ../api-deploy/src/functions/
-          
-          # Install only production dependencies in the deploy folder
-          cd ../api-deploy
-          npm install --omit=dev --no-audit --no-fund
-          
-          # Display final stats
-          echo "Final API deployment directory size:"
-          du -sh .
-          echo "Number of files in API deployment directory:"
-          find . -type f | wc -l
-          echo "List of top-level folders and their sizes:"
-          du -sh * | sort -hr
-      
-      # Deploy using SWA tool
+      # Use the default Oryx build process with our modified .funcignore
       - name: Build And Deploy
         id: builddeploy
         uses: Azure/static-web-apps-deploy@v1
@@ -68,9 +58,8 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: "upload"
           app_location: "./admin-frontend"
-          api_location: "./api-deploy"
+          api_location: "./api"
           output_location: "dist"
-          skip_api_build: true
         env:
           API_URL: ${{ secrets.API_URL }}
 
