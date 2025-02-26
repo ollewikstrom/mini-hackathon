@@ -341,7 +341,7 @@ export default function ResultScreen() {
 		<div className="w-full max-w-3xl mx-auto mb-8">
 			<div className="flex flex-col items-center">
 				<div className="avatar flex flex-col items-center gap-4">
-					<div className="ring-primary ring-offset-base-100 w-24 rounded-full ring ring-offset-2">
+					<div className="ring-primary ring-offset-base-100 w-48 rounded-full ring ring-offset-2">
 						<img src={judgeAvatar} alt="Mr Judge" />
 					</div>
 					<p className="text-xl font-semibold">Mr Judge</p>

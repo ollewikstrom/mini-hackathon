@@ -25,7 +25,7 @@ type MainScreenProps = {
 };
 
 export const judgeAvatar = createAvatar(bottts, {
-	size: 128,
+	size: 256,
 	seed: "veryGodJudge",
 }).toDataUri();
 

@@ -20,6 +20,7 @@ interface Player {
 	id: string;
 	gameId: string;
 	prompt: string;
+	screenName: string;
 }
 
 interface JudgeQuestion {
@@ -37,6 +38,13 @@ interface AIAnswer {
 	assistantPrompt: string;
 	answer: string;
 	timestamp: string;
+}
+
+interface AIAnswerError {
+	playerId: string;
+	questionId: string;
+	error: string;
+	details?: string;
 }
 
 export async function generateAnswers(
@@ -74,7 +82,7 @@ export async function generateAnswers(
 				},
 			};
 		}
-		const judgeQuestions: JudgeQuestion[] = game.judge.questions;
+		const judgeQuestions: JudgeQuestion[] = game.judge?.questions || [];
 		if (judgeQuestions.length === 0) {
 			return {
 				status: 404,
@@ -95,7 +103,6 @@ export async function generateAnswers(
 			.fetchAll();
 
 		// If no players are found, return
-
 		if (playerRes.resources.length === 0) {
 			return {
 				status: 404,
@@ -105,71 +112,161 @@ export async function generateAnswers(
 			};
 		}
 
-		const players = playerRes.resources;
+		const players: Player[] = playerRes.resources;
 
 		// Process each player's assistant with each judge question
 		const aiResponses = await Promise.all(
 			players.flatMap((player) =>
 				judgeQuestions.map(async (judgeQ) => {
-					if (!player.prompt) {
+					try {
+						if (!player.prompt) {
+							return {
+								playerId: player.id,
+								questionId: judgeQ.id,
+								error: "No prompt found for player",
+							} as AIAnswerError;
+						}
+
+						// Sanitize inputs to help prevent content filter issues
+						const sanitizedPrompt = sanitizeInput(player.prompt);
+						const sanitizedQuestion = sanitizeInput(judgeQ.content);
+
+						// Combine the assistant's prompt with the judge's question using a more structured approach
+						const combinedPrompt = createPrompt(
+							sanitizedPrompt,
+							sanitizedQuestion
+						);
+
+						// Add logging before making the API call
+						context.log(
+							`Sending request to OpenAI for player ${player.id} and question ${judgeQ.id}`
+						);
+
+						const response =
+							await openAIClient.chat.completions.create({
+								model: "gpt-35-turbo-16k",
+								messages: [
+									{
+										role: "user",
+										content: combinedPrompt,
+									},
+								],
+								temperature: 0.7,
+								max_tokens: 800,
+							});
+
+						// Check if we have a valid response
+						if (
+							!response ||
+							!response.choices ||
+							response.choices.length === 0
+						) {
+							context.log(
+								`Empty response received for player ${player.id} and question ${judgeQ.id}`
+							);
+							return {
+								playerId: player.id,
+								questionId: judgeQ.id,
+								error: "Empty response from AI service",
+							} as AIAnswerError;
+						}
+
+						const answer =
+							response.choices[0]?.message?.content || "";
+
+						return {
+							id: `${gameId}-${player.id}-${judgeQ.id}`,
+							gameId: player.gameId,
+							playerId: player.id,
+							playerName: player.screenName || "Unknown Player",
+							questionId: judgeQ.id,
+							question: judgeQ.content,
+							assistantPrompt: player.prompt,
+							answer: answer,
+							timestamp: new Date().toISOString(),
+						} as AIAnswer;
+					} catch (error) {
+						const errorMessage =
+							error instanceof Error
+								? error.message
+								: "Unknown error";
+						context.error(
+							`Error processing player ${player.id} with question ${judgeQ.id}: ${errorMessage}`
+						);
+
+						// Check if it's a content filter error
+						const isContentFilterError =
+							errorMessage.includes("content_filter") ||
+							errorMessage.includes("content filter") ||
+							errorMessage.includes("moderation");
+
 						return {
 							playerId: player.id,
 							questionId: judgeQ.id,
-							error: "No prompt found for player",
-						};
+							error: isContentFilterError
+								? "Content filter triggered"
+								: "Error generating response",
+							details: errorMessage,
+						} as AIAnswerError;
 					}
-
-					// Combine the assistant's prompt with the judge's question
-					const combinedPrompt = `You are an AI assistant with the following characteristics: ${player.prompt}\n\nPlease answer this question: ${judgeQ.content}. \n\n Your answer should not be longer than 1 sentence.`;
-
-					const response = await openAIClient.chat.completions.create(
-						{
-							model: "gpt-35-turbo-16k",
-							messages: [
-								{
-									role: "user",
-									content: combinedPrompt,
-								},
-							],
-							temperature: 0.7,
-							max_tokens: 800,
-						}
-					);
-
-					return {
-						id: `${gameId}-${player.id}-${judgeQ.id}`,
-						gameId: player.gameId,
-						playerId: player.id,
-						playerName: player.screenName,
-						questionId: judgeQ.id,
-						question: judgeQ.content,
-						assistantPrompt: player.prompt,
-						answer: response.choices[0].message.content,
-						timestamp: new Date().toISOString(),
-					};
 				})
 			)
 		);
 
-		await gameContainer.item(gameId, gameId).patch([
-			{
-				op: "add",
-				path: "/aiResponses",
-				value: aiResponses.filter((response) => !("error" in response)),
-			},
-		]);
-
+		// Filter out successful responses for DB storage
 		const successfulResponses = aiResponses.filter(
-			(response) => !("error" in response)
+			(response): response is AIAnswer => !("error" in response)
 		);
+
+		// Only update the database if there are successful responses
+		if (successfulResponses.length > 0) {
+			try {
+				await gameContainer.item(gameId, gameId).patch([
+					{
+						op: "add",
+						path: "/aiResponses",
+						value: successfulResponses,
+					},
+				]);
+				context.log(
+					`Successfully stored ${successfulResponses.length} AI responses in the database`
+				);
+			} catch (dbError) {
+				context.error(
+					`Error updating game with AI responses: ${
+						dbError instanceof Error
+							? dbError.message
+							: "Unknown error"
+					}`
+				);
+				// Continue execution despite DB error to return what we have to the client
+			}
+		}
+
+		// Prepare error summary for logging purposes
+		const errorResponses = aiResponses.filter(
+			(response) => "error" in response
+		) as AIAnswerError[];
+		if (errorResponses.length > 0) {
+			context.log(
+				`${errorResponses.length} errors occurred during processing`
+			);
+			errorResponses.forEach((err) => {
+				context.log(
+					`Player ${err.playerId}, Question ${err.questionId}: ${
+						err.error
+					} - ${err.details || "No details"}`
+				);
+			});
+		}
 
 		return {
 			status: 200,
 			jsonBody: {
-				message:
-					"Successfully processed all questions with player assistants",
+				message: "Processed player assistants with questions",
 				gameId: gameId,
 				processedCount: successfulResponses.length,
+				errorCount: errorResponses.length,
 				totalPlayers: players.length,
 				totalQuestions: judgeQuestions.length,
 				expectedTotal: players.length * judgeQuestions.length,
@@ -177,16 +274,39 @@ export async function generateAnswers(
 			},
 		};
 	} catch (error) {
-		context.error("Error in generateAnswers:", error);
+		const errorMessage =
+			error instanceof Error ? error.message : "Unknown error";
+		context.error(`Global error in generateAnswers: ${errorMessage}`);
 		return {
 			status: 500,
 			jsonBody: {
 				error: "Internal server error occurred",
-				message:
-					error instanceof Error ? error.message : "Unknown error",
+				message: errorMessage,
 			},
 		};
 	}
+}
+
+// Helper function to sanitize inputs before sending to OpenAI
+function sanitizeInput(input: string): string {
+	if (!input) return "";
+
+	// Remove any potentially problematic characters or patterns
+	return input
+		.replace(/^\s+|\s+$/g, "") // Trim whitespace
+		.replace(/[^\w\s.,?!;:()'"]/g, " ") // Replace special chars with space
+		.replace(/\s+/g, " "); // Normalize whitespace
+}
+
+// Create a structured prompt to reduce content filter triggers
+function createPrompt(assistantPrompt: string, question: string): string {
+	return `You are an AI assistant with the following characteristics:
+${assistantPrompt}
+
+Please respond to this question in a helpful, accurate, and appropriate manner:
+"${question}"
+
+Keep your answer concise (no more than 1-2 sentences).`;
 }
 
 app.http("generateAnswers", {
