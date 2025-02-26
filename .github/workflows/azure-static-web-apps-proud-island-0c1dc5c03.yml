@@ -25,31 +25,46 @@ jobs:
         with:
           node-version: '18'
           
-      # Modify .funcignore to exclude unnecessary files
-      - name: Update .funcignore
+      # Build the API first
+      - name: Build API
         working-directory: ./api
         run: |
-          echo "# Exclude unnecessary files to reduce deployment size" >> .funcignore
-          echo "node_modules/*/test" >> .funcignore
-          echo "node_modules/*/tests" >> .funcignore
-          echo "node_modules/*/docs" >> .funcignore
-          echo "node_modules/*/.github" >> .funcignore
-          echo "node_modules/*/.vscode" >> .funcignore
-          echo "node_modules/*/*.md" >> .funcignore
-          echo "node_modules/*/LICENSE" >> .funcignore
-          echo "node_modules/*/license" >> .funcignore
-          echo "node_modules/*/*.ts" >> .funcignore
-          echo "!node_modules/*/*.d.ts" >> .funcignore
-          echo "node_modules/*/*.map" >> .funcignore
-          echo "node_modules/*/src" >> .funcignore
-          echo "node_modules/*/examples" >> .funcignore
-          echo "node_modules/*/coverage" >> .funcignore
-          echo "node_modules/*/bin" >> .funcignore
-          echo "node_modules/*/man" >> .funcignore
-          echo "node_modules/*/.DS_Store" >> .funcignore
-          echo "node_modules/*/*.gitignore" >> .funcignore
+          npm ci
+          npm run build
+      
+      # Create a minimal API package
+      - name: Create minimal API package
+        run: |
+          # Create a minimal package.json with only essential dependencies
+          cat > minimal-api-package.json << EOF
+          {
+            "name": "minimal-api",
+            "version": "1.0.0",
+            "dependencies": {
+              "@azure/functions": "^4.0.0"
+            }
+          }
+          EOF
           
-      # Use the default Oryx build process with our modified .funcignore
+          # Create minimal deployment directory
+          mkdir -p api-minimal/src/functions
+          cp api/host.json api-minimal/
+          
+          # Only copy the compiled JavaScript files, not TypeScript sources
+          cp -r api/dist/* api-minimal/
+          
+          # Use the minimal package.json
+          cp minimal-api-package.json api-minimal/package.json
+          
+          # Install only the minimal dependencies
+          cd api-minimal
+          npm install --omit=dev --no-fund --no-audit
+          
+          # Show the final size
+          du -sh .
+          find . -type f | wc -l
+          
+      # Deploy the minimal API
       - name: Build And Deploy
         id: builddeploy
         uses: Azure/static-web-apps-deploy@v1
@@ -58,8 +73,9 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: "upload"
           app_location: "./admin-frontend"
-          api_location: "./api"
+          api_location: "./api-minimal"
           output_location: "dist"
+          skip_api_build: true
         env:
           API_URL: ${{ secrets.API_URL }}
 
