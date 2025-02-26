@@ -119,16 +119,10 @@ export async function generateAnswers(
 			players.flatMap((player) =>
 				judgeQuestions.map(async (judgeQ) => {
 					try {
-						if (!player.prompt) {
-							return {
-								playerId: player.id,
-								questionId: judgeQ.id,
-								error: "No prompt found for player",
-							} as AIAnswerError;
-						}
-
 						// Sanitize inputs to help prevent content filter issues
-						const sanitizedPrompt = sanitizeInput(player.prompt);
+						const sanitizedPrompt = sanitizeInput(
+							player.prompt ?? ""
+						);
 						const sanitizedQuestion = sanitizeInput(judgeQ.content);
 
 						// Combine the assistant's prompt with the judge's question using a more structured approach
