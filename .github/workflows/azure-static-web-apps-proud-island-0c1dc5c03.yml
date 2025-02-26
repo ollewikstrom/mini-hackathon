@@ -42,13 +42,14 @@ jobs:
           # Copy only the necessary files
           cp -r ./dist ../api-deploy/
           cp package.json ../api-deploy/
+          cp package-lock.json ../api-deploy/
           cp host.json ../api-deploy/
           mkdir -p ../api-deploy/src/functions
           cp -r ./src/functions/* ../api-deploy/src/functions/
           
           # Install only production dependencies in the deploy folder
           cd ../api-deploy
-          npm ci --production --no-audit --no-fund
+          npm install --omit=dev --no-audit --no-fund
           
           # Display final stats
           echo "Final API deployment directory size:"
