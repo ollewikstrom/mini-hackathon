@@ -3,11 +3,11 @@ name: Azure Static Web Apps CI/CD
 on:
     push:
         branches:
-            - main
+            - test
     pull_request:
         types: [opened, synchronize, reopened, closed]
         branches:
-            - main
+            - test
 
 jobs:
     build_and_deploy_job:
@@ -15,32 +15,6 @@ jobs:
         runs-on: windows-latest
         name: Build and Deploy Job
         steps:
-            - uses: actions/checkout@v3
-              with:
-                  submodules: true
-                  lfs: false
-
-            # Add this step to install dependencies and build the app
-            - name: Set up Node.js
-              uses: actions/setup-node@v3
-              with:
-                  node-version: "18"
-
-            - name: Install pnpm
-              uses: pnpm/action-setup@v2
-              with:
-                  version: 8
-
-            - name: Install dependencies
-              run: |
-                  cd admin-frontend
-                  pnpm install
-
-            - name: Build
-              run: |
-                  cd admin-frontend
-                  pnpm run build
-
             - name: Build And Deploy
               id: builddeploy
               uses: Azure/static-web-apps-deploy@v1
@@ -50,7 +24,6 @@ jobs:
                   action: "upload"
                   app_location: "./admin-frontend" # App source code path
                   output_location: "dist" # Changed from "./admin-frontend/dist" to just "dist"
-                  skip_app_build: true # Skip the build step since we've already built the app
 
     close_pull_request_job:
         if: github.event_name == 'pull_request' && github.event.action == 'closed'
