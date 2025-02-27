@@ -4,7 +4,7 @@ import FlipCard from "../components/FlipCard";
 import ChatBubble from "../components/ChatBubble";
 import { createAvatar } from "@dicebear/core";
 import { bottts } from "@dicebear/collection";
-import { judgeAvatar } from "./MainScreen";
+import { judgeAvatar } from "./MainScreen.tsx";
 
 interface Response {
 	id: string;

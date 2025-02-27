@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { getWebSocketClient } from "./ws/websocketClient";
-import MainScreen from "./pages/MainScreen";
+
 import { WebPubSubClient } from "@azure/web-pubsub-client";
 import { Route, Routes, useLocation, useNavigate } from "react-router";
+import MainScreen from "./pages/MainScreen.tsx";
 import ResultScreen from "./pages/ResultScreen";
 
 export default function App() {
